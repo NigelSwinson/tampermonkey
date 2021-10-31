@@ -267,7 +267,7 @@ function annotator() {
             });
             console.log('Extracted',bgg);
             var target = jQuery('#game_name').parent().closest('div').closest('div');
-            var bgglink = ['https://boardgamegeek.com/boardgame/',bgg.bggid,'/',bgg.bggname].join('');
+            var bgglink = ['https://boardgamegeek.com/boardgame/',bgg.id,'/',bgg.name].join('');
             target.append([
                 '<div style="font-weight: bold; position: relative; padding-left: 0px; line-height: 1.8em;background:#3f3a60;padding:15px;color:white;display:flex;justify-content:space-between;align-items:center">',
                 '<a href="',bgglink,'"><img src="https://cf.geekdo-static.com/images/logos/navbar-logo-bgg-b2.svg" style="margin-bottom:0"></a>',
