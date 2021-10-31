@@ -16,96 +16,13 @@
 // @grant        none
 // ==/UserScript==
 
-/*--- waitForKeyElements():  A utility function, for Greasemonkey scripts,
-// @require      https://gist.github.com/raw/2625891/waitForKeyElements.js
-
-    that detects and handles AJAXed content.
-
-    Usage example:
-
-        waitForKeyElements (
-            "div.comments"
-            , commentCallbackFunction
-        );
-
-        //--- Page-specific function to do what we want when the node is found.
-        function commentCallbackFunction (jNode) {
-            jNode.text ("This comment changed by waitForKeyElements().");
-        }
-
-    IMPORTANT: This function requires your script to have loaded jQuery.
-*/
-function waitForKeyElements (
-    selectorTxt,    /* Required: The jQuery selector string that
-                        specifies the desired element(s).
-                    */
-    actionFunction, /* Required: The code to run when elements are
-                        found. It is passed a jNode to the matched
-                        element.
-                    */
-    bWaitOnce,      /* Optional: If false, will continue to scan for
-                        new elements even after the first match is
-                        found.
-                    */
-    iframeSelector  /* Optional: If set, identifies the iframe to
-                        search.
-                    */
-) {
-    var targetNodes, btargetsFound;
-
-    if (typeof iframeSelector == "undefined")
-        targetNodes     = jQuery(selectorTxt);
-    else
-        targetNodes     = jQuery(iframeSelector).contents ()
-                                           .find (selectorTxt);
-
-    if (targetNodes  &&  targetNodes.length > 0) {
-        btargetsFound   = true;
-        /*--- Found target node(s).  Go through each and act if they
-            are new.
-        */
-        targetNodes.each ( function () {
-            var jThis        = jQuery(this);
-            var alreadyFound = jThis.data ('alreadyFound')  ||  false;
-
-            if (!alreadyFound) {
-                //--- Call the payload function.
-                var cancelFound     = actionFunction (jThis);
-                if (cancelFound)
-                    btargetsFound   = false;
-                else
-                    jThis.data('alreadyFound', true);
-            }
-        });
-    } else {
-        btargetsFound   = false;
-    }
-
-    //--- Get the timer-control variable for this selector.
-    var controlObj      = waitForKeyElements.controlObj  ||  {};
-    var controlKey      = selectorTxt.replace (/[^\w]/g, "_");
-    var timeControl     = controlObj [controlKey];
-
-    //--- Now set or clear the timer as appropriate.
-    if (btargetsFound && bWaitOnce && timeControl) {
-        //--- The only condition where we need to clear the timer.
-        clearInterval (timeControl);
-        delete controlObj [controlKey]
-    } else {
-        //--- Set a timer, if needed.
-        if (!timeControl) {
-            timeControl = setInterval ( function () {
-                waitForKeyElements (selectorTxt, actionFunction, bWaitOnce,iframeSelector);
-            },300);
-            controlObj[controlKey] = timeControl;
-        }
-    }
-    waitForKeyElements.controlObj = controlObj;
-}
-
+// Class object for annotating BGA
 function annotator() {
     return {
+        // Our local storage data object. Read at startup, written after changes
+        // Note this is domain specific, so on BGG it will be the BGG local storage. On BGA it will be the BGA local storage
         myData: {},
+        // Main entry point
         run: function() {
             // Get our local storage data
             var localData = window.localStorage.getItem('bga');
@@ -165,7 +82,7 @@ function annotator() {
         waitForBgg: function() {
             console.log('wait for BGG');
             var self = this;
-            waitForKeyElements(".game-header-body", function(node) {
+            this.waitForKeyElements(".game-header-body", function(node) {
                 console.log('Waited for',node);
                 var gameHeaderBody = node[0];
                 self.gameHeaderBody = gameHeaderBody;
@@ -181,7 +98,7 @@ function annotator() {
         },
         waitForBga: function() {
             var self = this;
-            waitForKeyElements("#gamelist_itemrow_inner_all", function(node) {
+            this.waitForKeyElements("#gamelist_itemrow_inner_all", function(node) {
                 console.log('Waited for',node);
                 var gamelist = node[0];
                 var games = jQuery(gamelist).find('div.gamelist_item')
@@ -252,6 +169,68 @@ function annotator() {
             this.save();
             return;
         },
+        // State for the wait loop
+        waitControlObj: {},
+        // A utility function, for Greasemonkey scripts
+        // Derived from https://gist.github.com/raw/2625891/waitForKeyElements.js
+        // selectorTxt: Required: The jQuery selector string that specifies the desired element(s).
+        // actionFunction: Required: The code to run when elements are found. It is passed a jNode to the matched element.
+        // bWaitOnce: Optional: If false, will continue to scan for new elements even after the first match is found.
+        // iframeSelector: Optional: If set, identifies the iframe to search.
+        waitForKeyElements: function(selectorTxt, actionFunction, bWaitOnce, iframeSelector) {
+            var self = this;
+            // Look for target notes in the given scope, of the given iFrame
+            var targetNodes = null;
+            if (typeof iframeSelector == "undefined") {
+                targetNodes = jQuery(selectorTxt);
+            } else {
+                targetNodes = jQuery(iframeSelector).contents().find(selectorTxt);
+            }
+
+            // If we found nodes
+            var btargetsFound = false;
+            if (targetNodes && targetNodes.length > 0) {
+                // Go through each and act if they are new.
+                btargetsFound = true;
+                targetNodes.each(function () {
+                    var jThis = jQuery(this);
+                    // If we have found this already, then skip it.
+                    var alreadyFound = jThis.data('alreadyFound') || false;
+                    if (alreadyFound) return;
+                    // Call the payload function.
+                    var cancelFound = actionFunction(jThis);
+                    if (cancelFound) {
+                        // If they have asked us to stop, then record this.
+                        btargetsFound = false;
+                        return;
+                    }
+                    // Record that we have found it, so we don't call it again.
+                    jThis.data('alreadyFound', true);
+                });
+            }
+
+            // Get the timer-control variable for this selector.
+            var controlObj = this.waitControlObj;
+            var controlKey = selectorTxt.replace(/[^\w]/g, "_");
+            var timeControl = controlObj[controlKey];
+
+            // If we found targets, and have already started a timer, and were told to only wait once
+            // Now set or clear the timer as appropriate.
+            if (btargetsFound && bWaitOnce && timeControl) {
+                // Then stop the existing timer
+                clearInterval(timeControl);
+                delete controlObj[controlKey]
+            } else {
+                // Set a timer, if needed.
+                if (!timeControl) {
+                    timeControl = setInterval(function () {
+                        self.waitForKeyElements(selectorTxt, actionFunction, bWaitOnce,iframeSelector);
+                    },300);
+                    controlObj[controlKey] = timeControl;
+                }
+            }
+            this.waitControlObj = controlObj;
+        }
     }
 }
 
