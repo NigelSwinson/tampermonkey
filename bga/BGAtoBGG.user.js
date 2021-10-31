@@ -276,6 +276,7 @@ function annotator() {
                 '<div><span style="font-weight:normal">Weight:</span>',bgg.weight,'/5</div>',
                 '</div>'
             ].join(''));
+            this.myData[gameid] = {};
             this.myData[gameid].bgg = bgg;
             this.save();
             return;
