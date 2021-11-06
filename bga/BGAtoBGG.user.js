@@ -625,7 +625,8 @@ function annotator() {
 
             // Annotate.
             //console.log(game);
-            jQuery(game).css('height','255px');
+            jQuery(game).css('height','285px');
+            jQuery(game).find('.gamename').css('height', '2rem');
             var content = ['<div><span title="The BGG rating. If not yet set, search for it and use the &quot;Link to BGA&quot; buttons added by this TampleMonkey script">Rating: ',bgg ? bgg.rating : '?','</span></div>'].join('');
             var bgglink = ['https://boardgamegeek.com/geeksearch.php?action=search&q=',encodeURIComponent(gameName),'&objecttype=boardgame#bgaid=',gameid,'&bganame=',gameName].join('');
 
