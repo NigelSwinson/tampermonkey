@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BGA/BGG connector
 // @namespace    https://boardgamearena.com/gamelist*
-// @version      1.3
+// @version      1.4
 // @description  Improve search experience working with the board gamearea game list
 // @author       nigel@swinson.com
 // Start on BGA's game list
@@ -530,7 +530,7 @@ function annotator() {
                 // Add in our filter
                 var bggFilter = [
                     '<div class="col-md-2" id="col_filter_bgg_rating">',
-                    '<div class="row-data row-data-smallwidth" style="border-bottom: none;">',
+                    '	<div class="row-data row-data-smallwidth" style="border-bottom: none;">',
                     '		<div class="row-label">',
                     '			<i class="fa fa-lightbulb-o" aria-hidden="true"></i>',
                     '			BGG Rating',
@@ -538,8 +538,25 @@ function annotator() {
                     '		<div class="row-value">',
                     '			<select id="filter_bgg_rating">',
                     '				<option value="0">Any</option>',
-                    '				<option value="7">Good (7+)</option>',
+                    '				<option value="6">Ok (6+)</option>',
+                    '				<option value="7">Better (7+)</option>',
+                    '				<option value="7.5">Good (7.5+)</option>',
                     '				<option value="8">Excellent (8+)</option>',
+                    '			</select>',
+                    '		</div>',
+                    '	</div>',
+                    '	<div class="row-data row-data-smallwidth" style="border-bottom: none;">',
+                    '		<div class="row-label">',
+                    '			<i class="fa fa-lightbulb-o" aria-hidden="true"></i>',
+                    '			BGG Weight',
+                    '		</div>',
+                    '		<div class="row-value">',
+                    '			<select id="filter_bgg_weight">',
+                    '				<option value="0">All</option>',
+                    '				<option value="1.5">Trivial (1.5+)</option>',
+                    '				<option value="2">Ok (2+)</option>',
+                    '				<option value="2.5">Hard (2.5+)</option>',
+                    '				<option value="3">Heavy (3+)</option>',
                     '			</select>',
                     '		</div>',
                     '	</div>',
@@ -548,8 +565,16 @@ function annotator() {
                 if (self.myData.filters && self.myData.filters.rating) {
                     jQuery(['#filter_bgg_rating option[value="',self.myData.filters.rating,'"]'].join('')).attr('selected',true);
                 }
+                if (self.myData.filters && self.myData.filters.weight) {
+                    jQuery(['#filter_bgg_weight option[value="',self.myData.filters.weight,'"]'].join('')).attr('selected',true);
+                }
 
                 jQuery('#filter_bgg_rating').on('change',function() {
+                    self.changeFilters();
+                    self.applyFilters();
+                });
+
+                jQuery('#filter_bgg_weight').on('change',function() {
                     self.changeFilters();
                     self.applyFilters();
                 });
@@ -565,10 +590,15 @@ function annotator() {
                 return option.selected;
             })
             var bggRating = bggRatingOption[0].value;
+            var bggWeightOption = jQuery('#filter_bgg_weight').find('option').filter(function(index,option) {
+                return option.selected;
+            })
+            var bggWeight = bggWeightOption[0].value;
             if (!this.myData.filters) {
                 this.myData.filters = {}
             }
             this.myData.filters.rating = bggRating;
+            this.myData.filters.weight = bggWeight;
             this.save();
         },
         applyFilters: function() {
@@ -592,6 +622,13 @@ function annotator() {
                 if (filters.rating) {
                     if (myData.bgg.rating) {
                         if (myData.bgg.rating < filters.rating) {
+                            visible = false;
+                        }
+                    }
+                }
+                if (filters.weight) {
+                    if (myData.bgg.weight) {
+                        if (myData.bgg.weight < filters.weight) {
                             visible = false;
                         }
                     }
@@ -654,7 +691,7 @@ function annotator() {
         },
         waitforBgaGamePanel: function() {
             // Get the BGA id from the url
-            var matches = window.location.href.match(/gamepanel\?game=(.*)#/);
+            var matches = window.location.href.match(/gamepanel\?game=(.*)#?/);
             if (!matches) return;
             var gameid = matches[1];
             // Get the BGG data from the hash fragment
