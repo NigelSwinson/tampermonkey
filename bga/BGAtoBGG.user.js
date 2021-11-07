@@ -424,7 +424,7 @@ function annotator() {
             if (localData) {
                 try {
                     this.myData = JSON.parse(localData);
-                    this.myData = jQuery.extend(this.bgaSourceData, this.myData);
+                    jQuery.extend(this.bgaSourceData, this.myData);
                 } catch (e) {
                     console.log('Local Storage for bga is corrupt. Resetting.',localData);
                     this.myData = this.bgaSourceData;
