@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BGA/BGG connector
 // @namespace    https://boardgamearena.com/gamelist*
-// @version      1.4
+// @version      1.5
 // @description  Improve search experience working with the board gamearea game list
 // @author       nigel@swinson.com
 // Start on BGA's game list
@@ -697,11 +697,17 @@ function annotator() {
             // Get the BGG data from the hash fragment
             var hash = window.location.hash;
             var bgg = {}
-            jQuery.each(window.location.hash.substring(1).split('&'), function(index, attribute) {
-                var tokens = attribute.split('=');
-                bgg[tokens[0]] = decodeURIComponent(tokens[1]);
-            });
-            console.log('Extracted',bgg);
+            if (hash) {
+                jQuery.each(window.location.hash.substring(1).split('&'), function(index, attribute) {
+                    var tokens = attribute.split('=');
+                    bgg[tokens[0]] = decodeURIComponent(tokens[1]);
+                });
+                console.log('Extracted',bgg);
+                this.myData[gameid] = {};
+                this.myData[gameid].bgg = bgg;
+            } else {
+                bgg = this.myData[gameid].bgg || {};
+            }
             var target = jQuery('#game_name').parent().closest('div').closest('div');
             var bgglink = ['https://boardgamegeek.com/boardgame/',bgg.id,'/',bgg.name].join('');
             target.append([
@@ -712,8 +718,6 @@ function annotator() {
                 '<div><span style="font-weight:normal">Weight:</span>',bgg.weight,'/5</div>',
                 '</div>'
             ].join(''));
-            this.myData[gameid] = {};
-            this.myData[gameid].bgg = bgg;
             this.save();
             return;
         },
