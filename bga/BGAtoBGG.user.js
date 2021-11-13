@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BGA/BGG connector
 // @namespace    https://boardgamearena.com/gamelist*
-// @version      1.6
+// @version      1.7
 // @description  Improve search experience working with the board gamearea game list
 // @author       nigel@swinson.com
 // Start on BGA's game list
@@ -691,7 +691,7 @@ function annotator() {
         },
         waitforBgaGamePanel: function() {
             // Get the BGA id from the url
-            var matches = window.location.href.match(/gamepanel\?game=(.*)#?/);
+            var matches = window.location.href.match(/gamepanel\?game=([^#.]*)#?/);
             if (!matches) return;
             var gameid = matches[1];
             // Get the BGG data from the hash fragment
