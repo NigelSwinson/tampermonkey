@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BGA/BGG connector
 // @namespace    https://boardgamearena.com/gamelist*
-// @version      1.6
+// @version      1.7
 // @description  Improve search experience working with the board gamearea game list
 // @author       nigel@swinson.com
 // Start on BGA's game list
@@ -652,7 +652,7 @@ function annotator() {
             var matches = anchor.match(/gamepanel\?game=(.*)$/);
             if (!matches) return;
             var gameid = matches[1];
-            var gameName = jQuery(game).find('.gamename')[0].innerHTML;
+            var gameName = jQuery(game).find('div.gamename')[0].innerHTML;
             gameName = jQuery.trim(gameName);
             var myData = this.myData[gameid];
             if (!myData) {
@@ -661,7 +661,7 @@ function annotator() {
             }
 
             // Annotate.
-            //console.log(game);
+            //console.log('Found game:',gameid,gameName,game);
             jQuery(game).css('height','285px');
             jQuery(game).find('.gamename').css('height', '2rem');
             var content = ['<div><span title="The BGG rating. If not yet set, search for it and use the &quot;Link to BGA&quot; buttons added by this TampleMonkey script">Rating: ',bgg ? bgg.rating : '?','</span></div>'].join('');
@@ -691,7 +691,7 @@ function annotator() {
         },
         waitforBgaGamePanel: function() {
             // Get the BGA id from the url
-            var matches = window.location.href.match(/gamepanel\?game=(.*)#?/);
+            var matches = window.location.href.match(/gamepanel\?game=([^#.]*)#?/);
             if (!matches) return;
             var gameid = matches[1];
             // Get the BGG data from the hash fragment
