@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BGA/BGG connector
 // @namespace    https://boardgamearena.com/gamelist*
-// @version      1.7
+// @version      1.8
 // @description  Improve search experience working with the board gamearea game list
 // @author       nigel@swinson.com
 // Start on BGA's game list
