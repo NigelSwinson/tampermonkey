@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BGA/BGG connector
 // @namespace    https://boardgamearena.com/gamelist*
-// @version      1.8
+// @version      1.9
 // @description  Improve search experience working with the board gamearea game list
 // @author       nigel@swinson.com
 // Start on BGA's game list
@@ -16,8 +16,187 @@
 // @grant        none
 // ==/UserScript==
 
+// Class to host the DropDown control
+function DropDown(name,options,value) {
+    return {
+        name: name,
+        key: value,
+        options: options,
+        control: null,
+        // When they select the control (show options)
+        select: function() {
+            this.control.find('.bga-dropdown').addClass('bga-dropdown--open');
+            this.control.find('.bga-dropdown-button-value').css('background', 'linear-gradient(0deg, rgb(242, 254, 250) 0%, rgb(194, 194, 194) 80%)');
+            this.control.find('.bga-dropdown-button-split').css('background', 'linear-gradient(rgb(20, 52, 83), rgb(17, 91, 163))');
+        },
+        // When they deselect the control (hide options)
+        deselect: function() {
+            this.control.find('.bga-dropdown').removeClass('bga-dropdown--open');
+            this.control.find('.bga-dropdown-button-value').css('background', 'linear-gradient(rgb(242, 254, 250) 0%, rgb(194, 194, 194) 80%)');
+            this.control.find('.bga-dropdown-button-split').css('background', 'linear-gradient(0deg, rgb(20, 52, 83), rgb(17, 91, 163))');
+        },
+        // If the control is selected (options are visible)
+        selected: function() {
+            return this.control.find('.bga-dropdown').hasClass('bga-dropdown--open');
+        },
+        // The current display value
+        value: function() {
+            if (!this.key) return 'Any';
+            if (!this.options[this.key]) return 'Invalid Option';
+            return this.options[this.key];
+        },
+        // Creates and returns the drop down control.
+        createControl: function() {
+            var self = this;
+            if (this.control) return this.control;
+            // The HTML here was sampled out of the Bgg source from one of the existing drop down controls
+            this.control = jQuery([
+                    '<div class="bga-game-filter-panel__input-block svelte-1na0la9">',
+                    '	<div class="text-gray-600 pl-6 mb-3 mt-1 text-sm desktop:text-lg">',this.name,'</div>',
+                    '	<div class="bga-dropdown relative svelte-49ash3 bga-dropdown--size-md">',
+                    '		<div class="bga-dropdown-button svelte-49ash3 FilterBggRatingDropdown">',
+                    '			<div class="bga-dropdown-button-wrap flex svelte-49ash3">',
+                    '				<div class="bga-dropdown-button-value flex-1 truncate svelte-49ash3" style="background: linear-gradient(rgb(242, 254, 250) 0%, rgb(194, 194, 194) 80%);">',
+                    '					<div slot="option-selected-none">',this.value(),'</div>',
+                    '				</div>',
+                    '				<div class="bga-dropdown-button-split svelte-49ash3" style="background: linear-gradient(0deg, rgb(20, 52, 83), rgb(17, 91, 163));">',
+                    '					<svg height="100%" width="100%" viewBox="0 0 100 100" preserveAspectRatio="none" class="svelte-49ash3">',
+                    '						<polygon points="50,70 25,40 75,40" class="triangle" fill="white"/>',
+                    '					</svg>',
+                    '				</div>',
+                    '			</div>',
+                    '		</div>',
+                    '	</div>',
+                    '</div>'].join(''));
+            this.control.click(function() {
+                if (self.selected()) {
+                    self.deselect();
+                    self.hideOptions();
+                } else {
+                    self.select();
+                    self.addOptions();
+                }
+            });
+
+            return this.control;
+        },
+        // The currently selected option (if any)
+        selectedOption: null,
+        // Create a filter option
+        filterOption: function(key, value) {
+            var self = this;
+            var selected = this.key == key;
+            var result = jQuery(['<div class="bg-gray-200 hover:bg-gray-300 px-3" style="border-bottom: 2px solid rgb(207, 207, 207);">',
+                    '	<div class="bga-checkbox--wrap flex items-center cursor-pointer svelte-xx51yh bga-checkbox--size-md">',
+                    '		<div class="bga-checkbox flex items-center justify-center svelte-xx51yh order-1">',
+                    '			<div class="bga-checkbox__checkmark rounded svelte-xx51yh" style="background-color: rgb(17, 91, 163);">',
+                    '				<svg width="50%" height="50%" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 77 77" class="svelte-xx51yh" style="margin: 25%;">',
+                    '					<path d="M125.897 178.078a2.523 2.523 0 0 0-3.567 0l-5.945 5.945-5.944-5.945a2.523 2.523 0 0 0-3.568 3.567l5.945 5.945-5.945 5.945a2.523 2.523 0 0 0 3.568 3.567l5.944-5.944 5.945 5.944a2.523 2.523 0 0 0 3.568-3.567l-5.945-5.945 5.945-5.945a2.523 2.523 0 0 0 0-3.567z" transform="matrix(3.77953 0 0 3.77953 -401.14 -670.26)" style="fill: rgb(255, 255, 255); stroke-width: 0.264583;"/>',
+                    '				</svg>',
+                    '			</div>',
+                    '		</div>',
+                    '		<div class="bga-checkbox__label flex-1 text-md text-gray-600 svelte-xx51yh line-clamp-2 bga-checkbox__label--left">',
+                    '			<div slot="label" class="ml-3 my-4 tablet:my-3 text-sm font-bold text-bga-blue line-clamp-2">',value,'</div>',
+                    '		</div>',
+                    '	</div>',
+                    '</div>'].join(''));
+            // Select the option
+            result.select = function() {
+                // If there's a selected option, deselect it
+                if (self.selectedOption) {
+                    self.selectedOption.deSelect();
+                    self.selectedOption = null;
+                }
+                // And select this option instead
+                result.addClass('bga-dropdown__option--current');
+                result.find('.bga-checkbox--wrap').addClass('bga-checkbox--checked');
+                self.selectedOption = result;
+            }
+            // Deselect the option
+            result.deSelect = function() {
+                result.removeClass('bga-dropdown__option--current');
+                result.find('.bga-checkbox--wrap').removeClass('bga-checkbox--checked');
+                self.selectedOption = null;
+            }
+            // If the option is selected
+            result.selected = function() {
+                return result.hasClass('bga-dropdown__option--current');
+            }
+            // Click handler for the option
+            result.click(function() {
+                if (result.selected()) {
+                    result.deSelect();
+                    self.key = null;
+                } else {
+                    result.select();
+                    self.key = key;
+                }
+                self.control.find('.bga-dropdown-button-value div').html(self.value());
+                if (self.change) self.change(self.key);
+            });
+            // If the option is already selected, select it.
+            if (this.key == key) {
+                result.select();
+            }
+            return result;
+        },
+        // Open the dialog with the options
+        addOptions: function() {
+            var self = this;
+            var dropDown = this.control.find('.bga-dropdown')[0];
+            var offset = this.control.find('.bga-dropdown').offset();
+            var left = dropDown.offsetLeft;
+            var top = offset.top + dropDown.offsetHeight;
+            this.optionsDialog = jQuery([
+                '<div class="bga-dropdown__list-wrap hidden bga-dropdown__list-wrap--tablet svelte-tgzd8r bga-modal" style="--tablet-modal-width:236px; min-width: 200px; position: absolute; top: ',top,'px; left: ',left,'px; max-height: 517px; max-width: 387px; z-index: 0;">',
+                '	<div class="bga-dropdown__list bg-bga-whitebg dark:bg-black rounded-md bga-modal-shadow bga-subtle-scrollbars svelte-tgzd8r">',
+                '		<div class="bga-dropdown__options-mobile-header flex items-center svelte-tgzd8r">',
+                '			<div class="flex-1 truncate pl-4">',this.name,'</div>',
+                '			<div class="cursor-pointer p-4">',
+                '				<i class="fa fa-close fa-lg"/>',
+                '			</div>',
+                '		</div>',
+                '		<div class="bga-dropdown__options">',
+                '        </div>',
+                '    </div>',
+                '</div>'].join(''));
+            var options = self.optionsDialog.find('.bga-dropdown__options');
+            console.log(this.options,Object.keys(this.options));
+            jQuery.each(this.options, function(key, value) {
+                console.log(key,value);
+                options.append(self.filterOption(key, value));
+            });
+
+            // Add in the layer which captures the "click to close" dialog
+            if (!this.fixedDialog) {
+                this.fixedDialog = jQuery('<div style="position: fixed; inset: 0px;"></div>');
+                this.fixedDialog.click(function() {
+                    self.control.click();
+                });
+            }
+
+            // The DropDown control needs some extra styles. Add them if they haven't already been created.
+            if (!jQuery('#DropDownStyles').length) {
+                jQuery(document.head).append('<style id="DropDownStyles">.bga-dropdown__list-wrap.svelte-tgzd8r{justify-content:center;flex-direction:column;background-color:rgba(0, 0, 0, 0.85);display:flex}@media(max-width: 599px){.bga-dropdown__list-wrap.svelte-tgzd8r{position:fixed !important;left:0 !important;top:0 !important;right:0 !important;bottom:0 !important;max-width:unset !important;max-height:unset !important}}@media(min-width: 600px){.bga-dropdown__list-wrap.svelte-tgzd8r{background-color:transparent;width:var(--tablet-modal-width)}.bga-dropdown__list.svelte-tgzd8r{margin:0}.bga-dropdown__options-mobile-header.svelte-tgzd8r{display:none}}.bga-dropdown__list.svelte-tgzd8r{overflow-y:auto}.bga-dropdown__options-mobile-header.svelte-tgzd8r{background:rgb(12, 115, 181);background:linear-gradient(180deg, rgb(12, 115, 181) 0%, rgb(34, 70, 136) 100%);color:white;font-weight:bold}</style>');
+            }
+
+            jQuery('#bga-modal-container')
+                .append(this.optionsDialog)
+                .prepend(this.fixedDialog);
+        },
+        // Hide the dialog with the options
+        hideOptions: function() {
+            this.fixedDialog.remove();
+            this.fixedDialog = null;
+            if (!this.optionsDialog) return;
+            this.optionsDialog.remove();
+            this.optionsDialog = null;
+        }
+    }
+}
+
 // Class object for annotating BGA
-function annotator() {
+function Annotator() {
     return {
         // Our local storage data object. Read at startup, written after changes
         // Note this is domain specific, so on BGG it will be the BGG local storage. On BGA it will be the BGA local storage
@@ -515,10 +694,12 @@ function annotator() {
         },
         waitForBga: function() {
             var self = this;
-            this.waitForKeyElements("#gamelist_itemrow_inner_all", function(node) {
+            console.log('Waiting for game list');
+            //
+            this.waitForKeyElements(".bga-game-grid", function(node) {
                 console.log('Waited for',node);
                 var gamelist = node[0];
-                var games = jQuery(gamelist).find('div.gamelist_item')
+                var games = jQuery(gamelist).find('a.bga-game-item')
                 console.log('Found',games.length,'games');
 
                 // Go through each game and annotate
@@ -527,116 +708,90 @@ function annotator() {
                 });
                 self.applyFilters();
 
-                // Add in our filter
-                var bggFilter = [
-                    '<div class="col-md-2" id="col_filter_bgg_rating">',
-                    '	<div class="row-data row-data-smallwidth" style="border-bottom: none;">',
-                    '		<div class="row-label">',
-                    '			<i class="fa fa-lightbulb-o" aria-hidden="true"></i>',
-                    '			BGG Rating',
-                    '		</div>',
-                    '		<div class="row-value">',
-                    '			<select id="filter_bgg_rating">',
-                    '				<option value="0">Any</option>',
-                    '				<option value="6">Ok (6+)</option>',
-                    '				<option value="7">Better (7+)</option>',
-                    '				<option value="7.5">Good (7.5+)</option>',
-                    '				<option value="8">Excellent (8+)</option>',
-                    '			</select>',
-                    '		</div>',
-                    '	</div>',
-                    '	<div class="row-data row-data-smallwidth" style="border-bottom: none;">',
-                    '		<div class="row-label">',
-                    '			<i class="fa fa-lightbulb-o" aria-hidden="true"></i>',
-                    '			BGG Weight',
-                    '		</div>',
-                    '		<div class="row-value">',
-                    '			<select id="filter_bgg_weight">',
-                    '				<option value="0">All</option>',
-                    '				<option value="1.5">Trivial (1.5+)</option>',
-                    '				<option value="2">Ok (2+)</option>',
-                    '				<option value="2.5">Hard (2.5+)</option>',
-                    '				<option value="3">Heavy (3+)</option>',
-                    '			</select>',
-                    '		</div>',
-                    '	</div>',
-                    '</div>'].join('');
-                jQuery(bggFilter).insertAfter('#col_filter_complexity');
-                if (self.myData.filters && self.myData.filters.rating) {
-                    jQuery(['#filter_bgg_rating option[value="',self.myData.filters.rating,'"]'].join('')).attr('selected',true);
+                // Add in our filters
+                if (!self.myData.filters) {
+                    self.myData.filters = {}
                 }
-                if (self.myData.filters && self.myData.filters.weight) {
-                    jQuery(['#filter_bgg_weight option[value="',self.myData.filters.weight,'"]'].join('')).attr('selected',true);
+                var filterPanel = jQuery('.bga-game-filter-panel__input-blocks').first();
+                var bggRatingFilter = new DropDown('BGG Rating',self.bggRatings,self.myData.filters.rating);
+                bggRatingFilter.change = function(newKey) {
+                    self.myData.filters.rating = newKey;
+                    self.save();
+                    self.applyFilters();
                 }
-
-                jQuery('#filter_bgg_rating').on('change',function() {
-                    self.changeFilters();
+                filterPanel.append(bggRatingFilter.createControl());
+                var bggWeightFilter = new DropDown('BGG Weight',self.bggWeights,self.myData.filters.weight);
+                bggWeightFilter.change = function(newKey) {
+                    self.myData.filters.weight = newKey;
+                    self.save();
                     self.applyFilters();
-                });
-
-                jQuery('#filter_bgg_weight').on('change',function() {
-                    self.changeFilters();
-                    self.applyFilters();
-                });
-
-                jQuery('#col_filter_more_filter').width('30px');
+                }
+                filterPanel.append(bggWeightFilter.createControl());
 
                 // Update our local storage
                 self.save();
             });
         },
-        changeFilters: function() {
-            var bggRatingOption = jQuery('#filter_bgg_rating').find('option').filter(function(index,option) {
-                return option.selected;
-            })
-            var bggRating = bggRatingOption[0].value;
-            var bggWeightOption = jQuery('#filter_bgg_weight').find('option').filter(function(index,option) {
-                return option.selected;
-            })
-            var bggWeight = bggWeightOption[0].value;
-            if (!this.myData.filters) {
-                this.myData.filters = {}
-            }
-            this.myData.filters.rating = bggRating;
-            this.myData.filters.weight = bggWeight;
-            this.save();
+        // Don't use floating point as the keys, else the sort order will be wrong.
+        bggRatings: {
+            1:'Unrated',
+            60:'Ok (6+)',
+            70:'Better (7+)',
+            75:'Good (7.5+)',
+            80:'Excellent (8+)',
+        },
+        bggWeights: {
+            15:'Trivial (1.5+)',
+            20:'Ok (2+)',
+            25:'Hard (2.5+)',
+            30:'Heavy (3+)',
         },
         applyFilters: function() {
             var self = this;
-            var games = jQuery('#gamelist_itemrow_inner_all').find('div.gamelist_item')
+            var games = jQuery(".bga-game-grid").find('a.bga-game-item');
             var filters = self.myData.filters;
             if (!filters) return;
-            console.log('Found',games.length,'games');
+            console.log('Filtering ',games.length,'games by',filters);
 
             // Go through each game and annotate
             jQuery.each(games,function(index, game) {
-                var anchor = jQuery(game).children('a')[0].href;
+                var anchor = game.href;
                 var matches = anchor.match(/gamepanel\?game=(.*)$/);
                 if (!matches) return;
                 var gameid = matches[1];
-                if (!self.myData[gameid]) return;
-                var myData = self.myData[gameid];
-                if (!myData.bgg) return;
+                // If we don't have any game data
+                var myData = {};
+                if (self.myData[gameid]) {
+                    myData = self.myData[gameid];
+                }
 
-                var visible = true;
-                if (filters.rating) {
-                    if (myData.bgg.rating) {
-                        if (myData.bgg.rating < filters.rating) {
-                            visible = false;
+                // By default, it will be visible if we have a bgg rating
+                var visible = !!myData.bgg;
+                // If they are looking for unrated games
+                if (filters.rating == 1) {
+                    // Then visible if we have no rating
+                    visible = !myData.bgg;
+                } else if (myData.bgg) {
+                    if (filters.rating) {
+                        if (myData.bgg.rating) {
+                            if (myData.bgg.rating*10 < filters.rating) {
+                                visible = false;
+                            }
+                        }
+                    }
+                    if (filters.weight) {
+                        if (myData.bgg.weight) {
+                            if (myData.bgg.weight*10 < filters.weight) {
+                                visible = false;
+                            }
                         }
                     }
                 }
-                if (filters.weight) {
-                    if (myData.bgg.weight) {
-                        if (myData.bgg.weight < filters.weight) {
-                            visible = false;
-                        }
-                    }
-                }
+                console.log(gameid,self.myData[gameid],filters,visible);
                 if (!visible) {
-                    jQuery(game).hide();
+                    jQuery(game).parent().hide();
                 } else {
-                    jQuery(game).show();
+                    jQuery(game).parent().show();
                 }
             });
         },
@@ -648,22 +803,24 @@ function annotator() {
         },
         annotateGame: function(game) {
             var self = this;
-            var anchor = jQuery(game).children('a')[0].href;
+            var anchor = game.href;
             var matches = anchor.match(/gamepanel\?game=(.*)$/);
             if (!matches) return;
             var gameid = matches[1];
-            var gameName = jQuery(game).find('div.gamename')[0].innerHTML;
-            gameName = jQuery.trim(gameName);
+
+            //var gameName = jQuery(game).find('div.gamename')[0].innerHTML;
+            //gameName = jQuery.trim(gameName);
             var myData = this.myData[gameid];
             if (!myData) {
                 myData = {};
                 delete this.myData[gameid];
             }
+            gameName = myData.bgg ? myData.bgg.name : gameid;
 
             // Annotate.
-            //console.log('Found game:',gameid,gameName,game);
-            jQuery(game).css('height','285px');
-            jQuery(game).find('.gamename').css('height', '2rem');
+            console.log('Found game:',gameid,myData,game);
+            //jQuery(game).css('height','285px');
+            //jQuery(game).find('.gamename').css('height', '2rem');
             var content = ['<div><span title="The BGG rating. If not yet set, search for it and use the &quot;Link to BGA&quot; buttons added by this TampleMonkey script">Rating: ',bgg ? bgg.rating : '?','</span></div>'].join('');
             var bgglink = ['https://boardgamegeek.com/geeksearch.php?action=search&q=',encodeURIComponent(gameName),'&objecttype=boardgame#bgaid=',gameid,'&bganame=',gameName].join('');
 
@@ -676,12 +833,11 @@ function annotator() {
                            '<div title="The weight is out of 5. Anything above 3 will be &quot;interesting&quot;"><span style="font-weight:normal">Weight:</span>',bgg.weight,'</div>',
                            '</div>'
                 ].join('');
-                console.log(gameid,bgg);
             }
 
-            jQuery(game).append(['<div style="padding:10px;display:flex;justify-content:space-between;background:#3f3a60;padding:15px;color:white;align-items:center">',
+            jQuery(game).after(['<div style="margin-left: 15%;padding:10px;display:flex;justify-content:space-between;background:#3f3a60;padding:15px;color:white;align-items:center">',
                                  // The raw image is 80x38.
-                                 '<a href="',bgglink,'" title="Open/Search in Board Game Geek"><img src="https://cf.geekdo-static.com/images/logos/navbar-logo-bgg-b2.svg" style="margin-bottom:0;width:40px;height:19px"></a>',
+                                 '<a href="',bgglink,'" title="Open/Search in Board Game Geek"><img src="https://cf.geekdo-static.com/images/logos/navbar-logo-bgg-b2.svg" style="margin-bottom:0;width:40px;height:19px"></a>',gameName,
                                  content,
                                  '</div>'].join(''));
 
@@ -789,6 +945,6 @@ function annotator() {
 (function() {
     'use strict';
 
-    var engine = new annotator();
+    var engine = new Annotator();
     engine.run();
 })();
