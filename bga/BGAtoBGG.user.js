@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BGA/BGG connector
 // @namespace    https://boardgamearena.com/gamelist*
-// @version      1.9
+// @version      2.0
 // @description  Improve search experience working with the board gamearea game list
 // @author       nigel@swinson.com
 // Start on BGA's game list
@@ -53,15 +53,15 @@ function DropDown(name,options,value) {
             this.control = jQuery([
                     '<div class="bga-game-filter-panel__input-block svelte-1na0la9">',
                     '	<div class="text-gray-600 pl-6 mb-3 mt-1 text-sm desktop:text-lg">',this.name,'</div>',
-                    '	<div class="bga-dropdown relative svelte-49ash3 bga-dropdown--size-md">',
-                    '		<div class="bga-dropdown-button svelte-49ash3 FilterBggRatingDropdown">',
-                    '			<div class="bga-dropdown-button-wrap flex svelte-49ash3">',
-                    '				<div class="bga-dropdown-button-value flex-1 truncate svelte-49ash3" style="background: linear-gradient(rgb(242, 254, 250) 0%, rgb(194, 194, 194) 80%);">',
-                    '					<div slot="option-selected-none">',this.value(),'</div>',
+                    '	<div class="bga-dropdown relative svelte-qfhsm1 bga-dropdown--size-md">',
+                    '		<div class="bga-dropdown-button svelte-qfhsm1">',
+                    '			<div class="bga-dropdown-button-wrap flex svelte-qfhsm1">',
+                    '				<div class="bga-dropdown-button-value flex-1 truncate svelte-qfhsm1" style="background: linear-gradient(rgb(242, 254, 250) 0%, rgb(194, 194, 194) 80%);">',
+                    '					<div slot="option-selected-none">Any</div>',
                     '				</div>',
-                    '				<div class="bga-dropdown-button-split svelte-49ash3" style="background: linear-gradient(0deg, rgb(20, 52, 83), rgb(17, 91, 163));">',
-                    '					<svg height="100%" width="100%" viewBox="0 0 100 100" preserveAspectRatio="none" class="svelte-49ash3">',
-                    '						<polygon points="50,70 25,40 75,40" class="triangle" fill="white"/>',
+                    '				<div class="bga-dropdown-button-split svelte-qfhsm1" style="background: linear-gradient(0deg, rgb(74, 95, 114), rgb(82, 135, 183));">',
+                    '					<svg viewBox="0 0 100 100" preserveAspectRatio="none" class="svelte-qfhsm1">',
+                    '						<polygon points="50,100 0,0 100,0" class="triangle" fill="white"/>',
                     '					</svg>',
                     '				</div>',
                     '			</div>',
@@ -702,6 +702,11 @@ function Annotator() {
                 var games = jQuery(gamelist).find('a.bga-game-item')
                 console.log('Found',games.length,'games');
 
+                self.gameids = {};
+                jQuery.each(globalUserInfos.game_list, function(index, game) {
+                    self.gameids[game.name] = game;
+                });
+
                 // Go through each game and annotate
                 jQuery.each(games,function(index, game) {
                     self.annotateGame(game);
@@ -807,6 +812,7 @@ function Annotator() {
             var matches = anchor.match(/gamepanel\?game=(.*)$/);
             if (!matches) return;
             var gameid = matches[1];
+            var bgaGameData = self.gameids[gameid];
 
             //var gameName = jQuery(game).find('div.gamename')[0].innerHTML;
             //gameName = jQuery.trim(gameName);
@@ -815,14 +821,17 @@ function Annotator() {
                 myData = {};
                 delete this.myData[gameid];
             }
-            gameName = myData.bgg ? myData.bgg.name : gameid;
+            gameName = myData.bgg ? myData.bgg.name : self.gameids[gameid].display_name;
 
             // Annotate.
             console.log('Found game:',gameid,myData,game);
             //jQuery(game).css('height','285px');
             //jQuery(game).find('.gamename').css('height', '2rem');
-            var content = ['<div><span title="The BGG rating. If not yet set, search for it and use the &quot;Link to BGA&quot; buttons added by this TampleMonkey script">Rating: ',bgg ? bgg.rating : '?','</span></div>'].join('');
+            var content = ['<div><span title="The BGG rating. If not yet set, search for it and use the &quot;Link to BGA&quot; buttons added by this TamperMonkey script">Rating: ',bgg ? bgg.rating : '?','</span></div>'].join('');
             var bgglink = ['https://boardgamegeek.com/geeksearch.php?action=search&q=',encodeURIComponent(gameName),'&objecttype=boardgame#bgaid=',gameid,'&bganame=',gameName].join('');
+            if (bgaGameData && bgaGameData.bgg_id) {
+                bgglink = ['https://boardgamegeek.com/boardgame/',bgaGameData.bgg_id,'#bgaid=',gameid,'&bganame=',gameName].join('');
+            }
 
             if (myData.bgg) {
                 var bgg = myData.bgg;
@@ -836,10 +845,12 @@ function Annotator() {
             }
 
             jQuery(game).after(['<div style="margin-left: 15%;padding:10px;display:flex;justify-content:space-between;background:#3f3a60;padding:15px;color:white;align-items:center">',
-                                 // The raw image is 80x38.
-                                 '<a href="',bgglink,'" title="Open/Search in Board Game Geek"><img src="https://cf.geekdo-static.com/images/logos/navbar-logo-bgg-b2.svg" style="margin-bottom:0;width:40px;height:19px"></a>',gameName,
-                                 content,
-                                 '</div>'].join(''));
+                                // The raw image is 80x38.
+                                '<a href="',bgglink,'" title="Open/Search in Board Game Geek">',
+                                (bgaGameData && bgaGameData.bgg_id) ? '<img src="https://cf.geekdo-static.com/images/logos/navbar-logo-bgg-b2.svg" style="margin-bottom:0;width:40px;height:19px">' : '',
+                                '</a>',gameName,
+                                content,
+                                '</div>'].join(''));
 
             jQuery(game).find('.bggLink').click(function() {
                 self.openBgg(gameid);
